@@ -84,9 +84,38 @@ def _sample_to_program(
   evolved_function.body = body
   return evolved_function, str(program)
 
-
+import docker
+import hashlib
+import os
 class Sandbox:
   """Sandbox for executing generated code."""
+  def __init__(self):
+    self.docker_client = docker.from_env()
+
+  def execute(self, script: str) -> tuple[Any, bool]:
+    HOME = os.environ["HOME"]
+    TMP_DIR = f"{HOME}/tmp/funsearch/"
+    key = hashlib.md5(script.encode("utf-8")).hexdigest()
+    dir = "%s%s/" % (TMP_DIR, key)
+    old_dir = os.getcwd()
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    fn = "ex.py"
+    f = open(dir+fn, "w")
+    f.write(script)
+    f.close()
+    client_dir = "/mnt/snippet/"
+    try:
+      r = self.docker_client.containers.run(
+        'namin/my-python',
+        f'python {client_dir}{fn}',
+        volumes={dir:{'bind':client_dir, 'mode': 'rw'}}
+      )
+    except docker.errors.ContainerError as e:
+      print("Exception is", repr(e))
+      return None, False
+    print("Result is", r)
+    return r, True
 
   def run(
       self,
@@ -96,8 +125,9 @@ class Sandbox:
       timeout_seconds: int,
   ) -> tuple[Any, bool]:
     """Returns `function_to_run(test_input)` and whether execution succeeded."""
-    raise NotImplementedError(
-        'Must provide a sandbox for executing untrusted code.')
+    cleaned_program = program.replace("@funsearch.run", "").replace("@funsearch.evolve", "")
+    (result, ok) = self.execute(cleaned_program+"\n"+f"print({function_to_run}({test_input}))\n")
+    return int(result.strip()) if ok else None, ok
 
 
 def _calls_ancestor(program: str, function_to_evolve: str) -> bool:

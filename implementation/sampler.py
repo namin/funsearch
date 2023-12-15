@@ -30,7 +30,12 @@ class LLM:
 
   def _draw_sample(self, prompt: str) -> str:
     """Returns a predicted continuation of `prompt`."""
-    raise NotImplementedError('Must provide a language model.')
+    import llm
+    print('prompt', prompt)
+    r = llm.generate(prompt, 1)[0]
+    c = r[len(prompt):]
+    print('continuation', c)
+    return c
 
   def draw_samples(self, prompt: str) -> Collection[str]:
     """Returns multiple predicted continuations of `prompt`."""
