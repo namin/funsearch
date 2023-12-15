@@ -92,7 +92,7 @@ class Sandbox:
   def __init__(self):
     self.docker_client = docker.from_env()
 
-  def execute(self, script: str) -> tuple[Any, bool]:
+  def execute(self, script: str, timeout_seconds: int) -> tuple[Any, bool]:
     HOME = os.environ["HOME"]
     TMP_DIR = f"{HOME}/tmp/funsearch/"
     key = hashlib.md5(script.encode("utf-8")).hexdigest()
@@ -108,7 +108,7 @@ class Sandbox:
     try:
       r = self.docker_client.containers.run(
         'namin/my-python',
-        f'python {client_dir}{fn}',
+        f'timeout {timeout_seconds} python {client_dir}{fn}',
         volumes={dir:{'bind':client_dir, 'mode': 'rw'}}
       )
     except docker.errors.ContainerError as e:
@@ -126,7 +126,7 @@ class Sandbox:
   ) -> tuple[Any, bool]:
     """Returns `function_to_run(test_input)` and whether execution succeeded."""
     cleaned_program = program.replace("@funsearch.run", "").replace("@funsearch.evolve", "")
-    (result, ok) = self.execute(cleaned_program+"\n"+f"print({function_to_run}({test_input}))\n")
+    (result, ok) = self.execute(cleaned_program+"\n"+f"print({function_to_run}({test_input}))\n", timeout_seconds)
     return int(result.strip()) if ok else None, ok
 
 
